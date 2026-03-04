@@ -136,29 +136,30 @@ export default function App() {
   const handleAddTile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activePageId) return;
+    
+    const tileData = {
+      ...form,
+      createdAt: Date.now()
+    };
+    
+    if (!tileData.url.startsWith('http')) {
+      tileData.url = 'https://' + tileData.url;
+    }
+
+    setForm({ title: '', url: '', color: COLORS[0] });
+    setShowModal(false);
+    setEditingTileId(null);
     setSyncing(true);
     
-    let url = form.url;
-    if (!url.startsWith('http')) url = 'https://' + url;
-    
     try {
-      const tileData = {
-        ...form,
-        url,
-        createdAt: Date.now()
-      };
-
       if (editingTileId) {
         await setDoc(doc(db, 'pages', activePageId, 'tiles', editingTileId), tileData, { merge: true });
       } else {
         await addDoc(collection(db, 'pages', activePageId, 'tiles'), tileData);
       }
-      
-      setShowModal(false);
-      setEditingTileId(null);
-      setForm({ title: '', url: '', color: COLORS[0] });
     } catch (err) {
       console.error("Add/Update tile error:", err);
+      alert("שגיאה בשמירת הקישור. נסי שוב.");
     } finally {
       setSyncing(false);
     }
@@ -173,17 +174,22 @@ export default function App() {
   const handleAddPage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!pageName.trim()) return;
+    
+    const newPageName = pageName;
+    setPageName('');
+    setShowPageModal(false);
     setSyncing(true);
+    
     try {
       const docRef = await addDoc(collection(db, 'pages'), {
-        name: pageName,
+        name: newPageName,
         createdAt: Date.now()
       });
       setActivePageId(docRef.id);
-      setShowPageModal(false);
-      setPageName('');
     } catch (err) {
       console.error("Page creation error:", err);
+      // If it fails, we might want to show the modal again or an error
+      alert("שגיאה ביצירת קטגוריה. נסי שוב.");
     } finally {
       setSyncing(false);
     }
