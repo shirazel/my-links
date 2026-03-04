@@ -1,11 +1,34 @@
-<div align="center">
+# לוח הקישורים שלי - My Links Board
 
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+לוח קישורים מעוצב, מודרני ועדין לניהול וגישה מהירה לאתרים המועדפים עליך.
 
-  <h1>Built with AI Studio</h2>
+## תכונות
+- ניהול קטגוריות (דפים) לסידור הקישורים.
+- הוספת קישורים עם בחירת צבעים.
+- אנימציות חלקות (Framer Motion).
+- עיצוב רספונסיבי (Tailwind CSS).
+- בסיס נתונים מקומי (SQLite).
 
-  <p>The fastest path from prompt to production with Gemini.</p>
+## התקנה והרצה מקומית
 
-  <a href="https://aistudio.google.com/apps">Start building</a>
+1. שכפל את המאגר:
+   ```bash
+   git clone <your-repo-url>
+   ```
 
-</div>
+2. התקן תלויות:
+   ```bash
+   npm install
+   ```
+
+3. הרץ את השרת במצב פיתוח:
+   ```bash
+   npm run dev
+   ```
+
+4. פתח את הדפדפן בכתובת: `http://localhost:3000`
+
+## טכנולוגיות
+- **Frontend**: React, Tailwind CSS, Lucide React, Framer Motion.
+- **Backend**: Express, Better-SQLite3.
+- **Build Tool**: Vite.
