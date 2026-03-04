@@ -79,17 +79,21 @@ export default function App() {
       const pagesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Page));
       setPages(pagesData);
       
-      if (pagesData.length === 0) {
-        // Create initial page if none exist
+      if (pagesData.length === 0 && !snapshot.metadata.fromCache) {
+        // Create initial page if none exist and not from cache
         const initialId = 'home';
         setDoc(doc(db, 'pages', initialId), {
           name: 'ראשי',
           createdAt: Date.now()
         });
-      } else if (!activePageId) {
+      } else if (pagesData.length > 0 && !activePageId) {
         setActivePageId(pagesData[0].id);
       }
-      setLoading(false);
+      
+      // If we have data (even from cache), we can stop loading
+      if (pagesData.length > 0 || !snapshot.metadata.fromCache) {
+        setLoading(false);
+      }
     }, (err) => {
       console.error("Firestore error:", err);
       if (err.code === 'permission-denied' || err.code === 'failed-precondition') {
