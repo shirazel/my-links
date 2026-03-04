@@ -75,6 +75,12 @@ export default function App() {
   // Subscribe to pages
   useEffect(() => {
     const q = query(collection(db, 'pages'), orderBy('createdAt', 'asc'));
+    
+    // Safety timeout: if it takes more than 3 seconds, stop loading
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, 3000);
+
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const pagesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Page));
       setPages(pagesData);
@@ -93,6 +99,7 @@ export default function App() {
       // If we have data (even from cache), we can stop loading
       if (pagesData.length > 0 || !snapshot.metadata.fromCache) {
         setLoading(false);
+        clearTimeout(timer);
       }
     }, (err) => {
       console.error("Firestore error:", err);
@@ -100,9 +107,13 @@ export default function App() {
         setConfigMissing(true);
       }
       setLoading(false);
+      clearTimeout(timer);
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+      clearTimeout(timer);
+    };
   }, [activePageId]);
 
   // Subscribe to tiles for active page
