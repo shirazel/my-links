@@ -8,7 +8,8 @@ import {
   Loader2, 
   Globe,
   PlusCircle,
-  AlertCircle
+  AlertCircle,
+  Edit2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -53,6 +54,7 @@ export default function App() {
   const [showModal, setShowModal] = useState(false);
   const [showPageModal, setShowPageModal] = useState(false);
   const [form, setForm] = useState({ title: '', url: '', color: COLORS[0] });
+  const [editingTileId, setEditingTileId] = useState<string | null>(null);
   const [pageName, setPageName] = useState('');
   const [editingPageId, setEditingPageId] = useState<string | null>(null);
   const [editPageName, setEditPageName] = useState('');
@@ -125,18 +127,32 @@ export default function App() {
     if (!url.startsWith('http')) url = 'https://' + url;
     
     try {
-      await addDoc(collection(db, 'pages', activePageId, 'tiles'), {
+      const tileData = {
         ...form,
         url,
         createdAt: Date.now()
-      });
+      };
+
+      if (editingTileId) {
+        await setDoc(doc(db, 'pages', activePageId, 'tiles', editingTileId), tileData, { merge: true });
+      } else {
+        await addDoc(collection(db, 'pages', activePageId, 'tiles'), tileData);
+      }
+      
       setShowModal(false);
+      setEditingTileId(null);
       setForm({ title: '', url: '', color: COLORS[0] });
     } catch (err) {
-      console.error("Add tile error:", err);
+      console.error("Add/Update tile error:", err);
     } finally {
       setSyncing(false);
     }
+  };
+
+  const openEditModal = (tile: Tile) => {
+    setForm({ title: tile.title, url: tile.url, color: tile.color });
+    setEditingTileId(tile.id);
+    setShowModal(true);
   };
 
   const handleAddPage = async (e: React.FormEvent) => {
@@ -271,11 +287,22 @@ export default function App() {
               >
                 {page.name}
                 {activePageId === page.id && (
-                  <Trash2 
-                    size={12} 
-                    className="text-rose-400 hover:text-rose-200 transition-colors" 
-                    onClick={(e) => deletePage(page.id, e)}
-                  />
+                  <div className="flex items-center gap-1">
+                    <Edit2 
+                      size={12} 
+                      className="text-blue-400 hover:text-blue-200 transition-colors" 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingPageId(page.id);
+                        setEditPageName(page.name);
+                      }}
+                    />
+                    <Trash2 
+                      size={12} 
+                      className="text-rose-400 hover:text-rose-200 transition-colors" 
+                      onClick={(e) => deletePage(page.id, e)}
+                    />
+                  </div>
                 )}
               </button>
             )}
@@ -333,6 +360,12 @@ export default function App() {
                 >
                   <Trash2 size={12} />
                 </button>
+                <button
+                  onClick={() => openEditModal(tile)}
+                  className="absolute -top-1 -right-1 bg-white text-blue-500 p-1.5 rounded-full shadow-md opacity-0 group-hover:opacity-100 transition-opacity z-10 hover:bg-blue-50 border border-slate-100 flex items-center justify-center"
+                >
+                  <Edit2 size={12} />
+                </button>
               </motion.div>
             ))}
           </AnimatePresence>
@@ -350,8 +383,8 @@ export default function App() {
               className="bg-white w-full max-w-sm rounded-[2rem] p-8 shadow-2xl"
             >
               <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-bold text-slate-800">הוספת קישור</h2>
-                <button onClick={() => setShowModal(false)} className="text-slate-300 hover:text-slate-500 transition-colors">
+                <h2 className="text-xl font-bold text-slate-800">{editingTileId ? 'עריכת קישור' : 'הוספת קישור'}</h2>
+                <button onClick={() => { setShowModal(false); setEditingTileId(null); setForm({ title: '', url: '', color: COLORS[0] }); }} className="text-slate-300 hover:text-slate-500 transition-colors">
                   <X size={20} />
                 </button>
               </div>
@@ -398,7 +431,7 @@ export default function App() {
                   disabled={syncing}
                   className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold text-base shadow-lg shadow-blue-100 hover:bg-blue-700 active:scale-95 transition-all mt-2 disabled:opacity-50 flex items-center justify-center gap-2"
                 >
-                  {syncing ? 'שומר...' : 'הוסף ללוח'}
+                  {syncing ? 'שומר...' : (editingTileId ? 'עדכן קישור' : 'הוסף ללוח')}
                 </button>
               </form>
             </motion.div>
