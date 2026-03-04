@@ -54,6 +54,8 @@ export default function App() {
   const [showPageModal, setShowPageModal] = useState(false);
   const [form, setForm] = useState({ title: '', url: '', color: COLORS[0] });
   const [pageName, setPageName] = useState('');
+  const [editingPageId, setEditingPageId] = useState<string | null>(null);
+  const [editPageName, setEditPageName] = useState('');
   const [configMissing, setConfigMissing] = useState(false);
 
   // Check if Firebase is configured
@@ -165,6 +167,41 @@ export default function App() {
     }
   };
 
+  const deletePage = async (pageId: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // מונע מהקטגוריה להיבחר כשלוחצים על מחיקה
+    if (!confirm('האם את בטוחה שברצונך למחוק את הקטגוריה הזו ואת כל הקישורים שבה?')) return;
+    
+    setSyncing(true);
+    try {
+      // מחיקת הקטגוריה עצמה
+      await deleteDoc(doc(db, 'pages', pageId));
+      
+      // אם מחקנו את הקטגוריה הפעילה, נעבור לראשונה שנשארה
+      if (activePageId === pageId) {
+        setActivePageId(pages.find(p => p.id !== pageId)?.id || null);
+      }
+    } catch (err) {
+      console.error("Delete page error:", err);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const handleUpdatePageName = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingPageId || !editPageName.trim()) return;
+    
+    setSyncing(true);
+    try {
+      await setDoc(doc(db, 'pages', editingPageId), { name: editPageName }, { merge: true });
+      setEditingPageId(null);
+    } catch (err) {
+      console.error("Update page name error:", err);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   if (configMissing) return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center font-sans p-6 text-center" dir="rtl">
       <div className="max-w-md bg-white p-8 rounded-[2rem] shadow-xl border border-rose-100">
@@ -208,21 +245,45 @@ export default function App() {
       {/* Navigation */}
       <nav className="bg-white border-b px-6 py-3 flex items-center gap-2 overflow-x-auto no-scrollbar">
         {pages.map(page => (
-          <button
-            key={page.id}
-            onClick={() => setActivePageId(page.id)}
-            className={`px-6 py-2 rounded-full text-xs font-bold transition-all whitespace-nowrap ${
-              activePageId === page.id 
-              ? 'bg-slate-800 text-white shadow-md scale-105' 
-              : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-            }`}
-          >
-            {page.name}
-          </button>
+          <div key={page.id} className="relative group flex-shrink-0">
+            {editingPageId === page.id ? (
+              <form onSubmit={handleUpdatePageName} className="flex items-center">
+                <input
+                  autoFocus
+                  value={editPageName}
+                  onChange={e => setEditPageName(e.target.value)}
+                  onBlur={() => setEditingPageId(null)}
+                  className="px-4 py-2 rounded-full text-xs font-bold bg-slate-100 border-2 border-blue-500 outline-none w-32"
+                />
+              </form>
+            ) : (
+              <button
+                onClick={() => setActivePageId(page.id)}
+                onDoubleClick={() => {
+                  setEditingPageId(page.id);
+                  setEditPageName(page.name);
+                }}
+                className={`px-6 py-2 rounded-full text-xs font-bold transition-all whitespace-nowrap flex items-center gap-2 ${
+                  activePageId === page.id 
+                  ? 'bg-slate-800 text-white shadow-md scale-105' 
+                  : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                }`}
+              >
+                {page.name}
+                {activePageId === page.id && (
+                  <Trash2 
+                    size={12} 
+                    className="text-rose-400 hover:text-rose-200 transition-colors" 
+                    onClick={(e) => deletePage(page.id, e)}
+                  />
+                )}
+              </button>
+            )}
+          </div>
         ))}
         <button 
           onClick={() => setShowPageModal(true)}
-          className="p-2 rounded-full bg-slate-50 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+          className="p-2 rounded-full bg-slate-50 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors flex-shrink-0"
         >
           <PlusCircle size={20} />
         </button>
