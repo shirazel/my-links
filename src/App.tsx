@@ -133,38 +133,39 @@ export default function App() {
     return () => unsubscribe();
   }, [activePageId]);
 
-  const handleAddTile = async (e: React.FormEvent) => {
+  const handleAddTile = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!activePageId || syncing) return;
+    if (!activePageId) return;
     
+    const tileData = {
+      ...form,
+      createdAt: Date.now()
+    };
+    
+    if (!tileData.url.startsWith('http')) {
+      tileData.url = 'https://' + tileData.url;
+    }
+
+    // סגירה וניקוי מיידי של הממשק
+    const currentEditingId = editingTileId;
+    setForm({ title: '', url: '', color: COLORS[0] });
+    setShowModal(false);
+    setEditingTileId(null);
     setSyncing(true);
     
-    try {
-      const tileData = {
-        ...form,
-        createdAt: Date.now()
-      };
-      
-      if (!tileData.url.startsWith('http')) {
-        tileData.url = 'https://' + tileData.url;
-      }
+    // ביצוע השמירה ברקע בלי לחכות (await)
+    const savePromise = currentEditingId
+      ? setDoc(doc(db, 'pages', activePageId, 'tiles', currentEditingId), tileData, { merge: true })
+      : addDoc(collection(db, 'pages', activePageId, 'tiles'), tileData);
 
-      if (editingTileId) {
-        await setDoc(doc(db, 'pages', activePageId, 'tiles', editingTileId), tileData, { merge: true });
-      } else {
-        await addDoc(collection(db, 'pages', activePageId, 'tiles'), tileData);
-      }
-      
-      // סגירת המודל רק אחרי הצלחה
-      setShowModal(false);
-      setEditingTileId(null);
-      setForm({ title: '', url: '', color: COLORS[0] });
-    } catch (err) {
-      console.error("Add/Update tile error:", err);
-      alert("שגיאה בשמירת הקישור. וודאי שיש חיבור לאינטרנט וניסי שוב.");
-    } finally {
-      setSyncing(false);
-    }
+    savePromise
+      .catch(err => {
+        console.error("Add/Update tile error:", err);
+        alert("שגיאה בשמירת הקישור. הוא יישמר ברגע שהחיבור יתחדש.");
+      })
+      .finally(() => {
+        setSyncing(false);
+      });
   };
 
   const openEditModal = (tile: Tile) => {
@@ -173,26 +174,30 @@ export default function App() {
     setShowModal(true);
   };
 
-  const handleAddPage = async (e: React.FormEvent) => {
+  const handleAddPage = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!pageName.trim() || syncing) return;
+    if (!pageName.trim()) return;
     
+    const newName = pageName;
+    setPageName('');
+    setShowPageModal(false);
     setSyncing(true);
     
-    try {
-      const docRef = await addDoc(collection(db, 'pages'), {
-        name: pageName,
-        createdAt: Date.now()
-      });
+    // ביצוע השמירה ברקע
+    addDoc(collection(db, 'pages'), {
+      name: newName,
+      createdAt: Date.now()
+    })
+    .then(docRef => {
       setActivePageId(docRef.id);
-      setShowPageModal(false);
-      setPageName('');
-    } catch (err) {
+    })
+    .catch(err => {
       console.error("Page creation error:", err);
-      alert("שגיאה ביצירת קטגוריה. נסי שוב.");
-    } finally {
+      alert("שגיאה ביצירת קטגוריה.");
+    })
+    .finally(() => {
       setSyncing(false);
-    }
+    });
   };
 
   const deleteTile = async (tileId: string) => {
