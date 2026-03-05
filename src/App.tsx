@@ -190,6 +190,12 @@ export default function App() {
     e.preventDefault();
     if (!pageName.trim() || syncing) return;
     
+    // Check if config is likely missing
+    if (!import.meta.env.VITE_FIREBASE_API_KEY) {
+      alert("נראה שחסרה הגדרת Firebase. וודאי שהגדרת את משתני הסביבה ב-Vercel.");
+      return;
+    }
+
     setSyncing(true);
     try {
       const docRef = await addDoc(collection(db, 'pages'), {
@@ -199,9 +205,15 @@ export default function App() {
       setActivePageId(docRef.id);
       setShowPageModal(false);
       setPageName('');
-    } catch (err) {
+    } catch (err: any) {
       console.error("Page creation error:", err);
-      alert("שגיאה ביצירת קטגוריה. נסי שוב.");
+      let errorMsg = "שגיאה ביצירת קטגוריה.";
+      if (err.code === 'permission-denied') {
+        errorMsg += "\nאין הרשאות כתיבה. וודאי שכללי ה-Database ב-Firebase מוגדרים כ-Test Mode.";
+      } else {
+        errorMsg += `\nפרטי השגיאה: ${err.message || err.code || 'לא ידוע'}`;
+      }
+      alert(errorMsg);
     } finally {
       setSyncing(false);
     }
@@ -252,6 +264,7 @@ export default function App() {
   };
 
   const createDefaultPage = async () => {
+    if (syncing) return;
     setSyncing(true);
     try {
       const initialId = 'home';
@@ -260,9 +273,15 @@ export default function App() {
         createdAt: Date.now()
       });
       setActivePageId(initialId);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Manual page creation error:", err);
-      alert("שגיאה ביצירת קטגוריה.");
+      let errorMsg = "שגיאה ביצירת קטגוריה.";
+      if (err.code === 'permission-denied') {
+        errorMsg += "\nאין הרשאות כתיבה. וודאי שכללי ה-Database ב-Firebase מוגדרים כ-Test Mode.";
+      } else {
+        errorMsg += `\nפרטי השגיאה: ${err.message || err.code || 'לא ידוע'}`;
+      }
+      alert(errorMsg);
     } finally {
       setSyncing(false);
     }
