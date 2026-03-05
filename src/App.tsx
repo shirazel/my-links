@@ -78,26 +78,35 @@ export default function App() {
     
     const timer = setTimeout(() => {
       setLoading(false);
-    }, 5000);
+    }, 8000); // Increased timeout for slower connections
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const pagesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Page));
       setPages(pagesData);
       
+      // If no pages exist, create the default one
       if (pagesData.length === 0 && !snapshot.metadata.fromCache) {
         const initialId = 'home';
         setDoc(doc(db, 'pages', initialId), {
           name: 'ראשי',
           createdAt: Date.now()
+        }).catch(err => console.error("Initial page creation error:", err));
+      } 
+      
+      // Always ensure we have an active page if pages exist
+      if (pagesData.length > 0) {
+        setActivePageId(prev => {
+          if (!prev || !pagesData.find(p => p.id === prev)) {
+            return pagesData[0].id;
+          }
+          return prev;
         });
-      } else if (pagesData.length > 0 && !activePageId) {
-        setActivePageId(pagesData[0].id);
+      } else {
+        setActivePageId(null);
       }
       
-      if (pagesData.length > 0 || !snapshot.metadata.fromCache) {
-        setLoading(false);
-        clearTimeout(timer);
-      }
+      setLoading(false);
+      clearTimeout(timer);
     }, (err) => {
       console.error("Firestore error:", err);
       setLoading(false);
@@ -108,7 +117,7 @@ export default function App() {
       unsubscribe();
       clearTimeout(timer);
     };
-  }, []); // Removed activePageId dependency to prevent unnecessary re-subscriptions
+  }, []);
 
   // Subscribe to tiles for active page
   useEffect(() => {
@@ -129,7 +138,19 @@ export default function App() {
 
   const handleAddTile = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!activePageId || syncing) return;
+    if (syncing) return;
+    
+    // Fallback if activePageId is missing but pages exist
+    let targetPageId = activePageId;
+    if (!targetPageId && pages.length > 0) {
+      targetPageId = pages[0].id;
+      setActivePageId(targetPageId);
+    }
+
+    if (!targetPageId) {
+      alert("לא נבחרה קטגוריה. אנא צרי קטגוריה תחילה.");
+      return;
+    }
     
     setSyncing(true);
     try {
@@ -143,9 +164,9 @@ export default function App() {
       }
 
       if (editingTileId) {
-        await setDoc(doc(db, 'pages', activePageId, 'tiles', editingTileId), tileData, { merge: true });
+        await setDoc(doc(db, 'pages', targetPageId, 'tiles', editingTileId), tileData, { merge: true });
       } else {
-        await addDoc(collection(db, 'pages', activePageId, 'tiles'), tileData);
+        await addDoc(collection(db, 'pages', targetPageId, 'tiles'), tileData);
       }
       
       setShowModal(false);
@@ -230,6 +251,23 @@ export default function App() {
     }
   };
 
+  const createDefaultPage = async () => {
+    setSyncing(true);
+    try {
+      const initialId = 'home';
+      await setDoc(doc(db, 'pages', initialId), {
+        name: 'ראשי',
+        createdAt: Date.now()
+      });
+      setActivePageId(initialId);
+    } catch (err) {
+      console.error("Manual page creation error:", err);
+      alert("שגיאה ביצירת קטגוריה.");
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   if (configMissing) return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center font-sans p-6 text-center" dir="rtl">
       <div className="max-w-md bg-white p-8 rounded-[2rem] shadow-xl border border-rose-100">
@@ -247,9 +285,18 @@ export default function App() {
 
   if (loading) return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center font-sans">
-      <div className="flex flex-col items-center gap-4">
+      <div className="flex flex-col items-center gap-6">
         <Loader2 className="w-12 h-12 text-blue-600 animate-spin" />
-        <p className="text-slate-500 font-bold">מתחבר ל-Firebase...</p>
+        <div className="text-center">
+          <p className="text-slate-500 font-bold mb-2">מתחבר ל-Firebase...</p>
+          <p className="text-slate-400 text-xs">אם הטעינה לוקחת זמן רב, נסי לרענן</p>
+        </div>
+        <button 
+          onClick={() => window.location.reload()}
+          className="px-6 py-2 bg-white border border-slate-200 rounded-full text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors shadow-sm"
+        >
+          רענן דף
+        </button>
       </div>
     </div>
   );
@@ -264,14 +311,30 @@ export default function App() {
           </div>
           <h1 className="text-lg font-bold text-slate-800 tracking-tight">הקישורים שלי</h1>
         </div>
-        <div className="flex items-center gap-2 text-[9px] font-bold px-3 py-1.5 rounded-full bg-green-50 text-green-600 border border-green-100 uppercase tracking-wider">
-          <div className={`w-1 h-1 rounded-full ${syncing ? 'bg-amber-400 animate-pulse' : 'bg-green-500'}`}></div>
-          {syncing ? 'מעדכן...' : 'מחובר'}
+        <div className="flex items-center gap-4">
+          <button 
+            onClick={() => window.location.reload()} 
+            className="text-[10px] font-bold text-slate-400 hover:text-blue-600 transition-colors uppercase tracking-widest"
+          >
+            רענן דף
+          </button>
+          <div className="flex items-center gap-2 text-[9px] font-bold px-3 py-1.5 rounded-full bg-green-50 text-green-600 border border-green-100 uppercase tracking-wider">
+            <div className={`w-1 h-1 rounded-full ${syncing ? 'bg-amber-400 animate-pulse' : 'bg-green-500'}`}></div>
+            {syncing ? 'מעדכן...' : 'מחובר'}
+          </div>
         </div>
       </header>
 
       {/* Navigation */}
       <nav className="bg-white border-b px-6 py-3 flex items-center gap-2 overflow-x-auto no-scrollbar">
+        {pages.length === 0 && !loading && (
+          <button 
+            onClick={createDefaultPage}
+            className="px-6 py-2 rounded-full text-xs font-bold bg-blue-600 text-white shadow-md"
+          >
+            צור קטגוריית ברירת מחדל
+          </button>
+        )}
         {pages.map(page => (
           <div key={page.id} className="relative group flex-shrink-0">
             {editingPageId === page.id ? (
